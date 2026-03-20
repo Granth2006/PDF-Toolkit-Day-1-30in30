@@ -1,0 +1,918 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="PDF Toolkit — Merge, Split, Compress, Convert, Reorder and Edit PDFs directly in your browser. Free, fast, private." />
+  <title>PDF Toolkit — Browser-Based PDF Editor</title>
+  <link rel="stylesheet" href="style.css" />
+
+  <!-- CDN Libraries -->
+  <!-- PDF-Lib: PDF manipulation -->
+  <script src="https://cdn.jsdelivr.net/npm/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
+  <!-- PDF.js: PDF rendering -->
+  <script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js"></script>
+  <!-- SortableJS: drag-and-drop reordering -->
+  <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.2/Sortable.min.js"></script>
+</head>
+<body>
+
+<!-- ========== SIDEBAR BACKDROP (mobile) ========== -->
+<div class="sidebar-backdrop" id="sidebarBackdrop"></div>
+
+<!-- ========== TOAST CONTAINER ========== -->
+<div class="toast-container" id="toastContainer" aria-live="polite"></div>
+
+<!-- ========== OVERLAY / MODAL ========== -->
+<div class="overlay" id="modalOverlay">
+  <div class="modal" id="mainModal">
+    <div class="modal-header">
+      <h3 id="modalTitle">Modal</h3>
+      <button class="modal-close" id="modalClose" aria-label="Close">✕</button>
+    </div>
+    <div class="modal-body" id="modalBody"></div>
+    <div class="modal-footer" id="modalFooter">
+      <button class="btn btn-secondary" id="modalCancelBtn">Cancel</button>
+      <button class="btn btn-primary" id="modalConfirmBtn">Confirm</button>
+    </div>
+  </div>
+</div>
+
+<!-- ========== APP LAYOUT ========== -->
+<div class="app-layout">
+
+  <!-- ---- SIDEBAR ---- -->
+  <aside class="sidebar" id="sidebar" aria-label="Navigation">
+    <div class="sidebar-logo">
+      <div class="logo-icon" aria-hidden="true">📄</div>
+      <div class="logo-text">PDF<span>Toolkit</span></div>
+    </div>
+
+    <div class="sidebar-section">
+      <div class="sidebar-section-label">Core Tools</div>
+
+      <button class="nav-item active" data-tool="home" id="nav-home">
+        <span class="nav-icon">🏠</span>
+        <span class="nav-label">Home</span>
+      </button>
+
+      <button class="nav-item" data-tool="merge" id="nav-merge">
+        <span class="nav-icon">🔗</span>
+        <span class="nav-label">Merge PDFs</span>
+      </button>
+
+      <button class="nav-item" data-tool="split" id="nav-split">
+        <span class="nav-icon">✂️</span>
+        <span class="nav-label">Split PDF</span>
+      </button>
+
+      <button class="nav-item" data-tool="compress" id="nav-compress">
+        <span class="nav-icon">🗜️</span>
+        <span class="nav-label">Compress PDF</span>
+      </button>
+
+      <button class="nav-item" data-tool="pdf-to-text" id="nav-pdf-to-text">
+        <span class="nav-icon">📝</span>
+        <span class="nav-label">PDF to Text</span>
+      </button>
+
+      <button class="nav-item" data-tool="image-to-pdf" id="nav-image-to-pdf">
+        <span class="nav-icon">🖼️</span>
+        <span class="nav-label">Image to PDF</span>
+      </button>
+
+      <button class="nav-item" data-tool="reorder" id="nav-reorder">
+        <span class="nav-icon">🔀</span>
+        <span class="nav-label">Reorder Pages</span>
+      </button>
+
+      <button class="nav-item" data-tool="delete-pages" id="nav-delete-pages">
+        <span class="nav-icon">🗑️</span>
+        <span class="nav-label">Delete Pages</span>
+      </button>
+    </div>
+
+    <div class="sidebar-section" style="margin-top:8px;">
+      <div class="sidebar-section-label">Advanced</div>
+
+      <button class="nav-item" data-tool="watermark" id="nav-watermark">
+        <span class="nav-icon">💧</span>
+        <span class="nav-label">Add Watermark</span>
+      </button>
+
+      <button class="nav-item" data-tool="page-numbers" id="nav-page-numbers">
+        <span class="nav-icon">🔢</span>
+        <span class="nav-label">Page Numbers</span>
+      </button>
+
+      <button class="nav-item" data-tool="rotate" id="nav-rotate">
+        <span class="nav-icon">🔄</span>
+        <span class="nav-label">Rotate Pages</span>
+      </button>
+
+      <button class="nav-item" data-tool="protect" id="nav-protect">
+        <span class="nav-icon">🔒</span>
+        <span class="nav-label">Protect PDF</span>
+      </button>
+
+      <button class="nav-item" data-tool="viewer" id="nav-viewer">
+        <span class="nav-icon">👁️</span>
+        <span class="nav-label">PDF Viewer</span>
+      </button>
+
+      <button class="nav-item" data-tool="sign" id="nav-sign">
+        <span class="nav-icon">✍️</span>
+        <span class="nav-label">Sign PDF</span>
+      </button>
+    </div>
+
+    <div class="sidebar-footer">
+      <button class="theme-toggle-btn" id="themeToggle" aria-label="Toggle dark mode">
+        <span id="themeIcon">🌙</span>
+        <span id="themeLabel">Dark Mode</span>
+      </button>
+    </div>
+  </aside>
+
+  <!-- ---- MAIN CONTENT ---- -->
+  <main class="main-content">
+
+    <!-- TOP BAR -->
+    <header class="topbar">
+      <button class="menu-toggle" id="menuToggle" aria-label="Toggle menu">☰</button>
+      <div>
+        <div class="topbar-title" id="topbarTitle">Welcome to PDF Toolkit</div>
+        <div class="topbar-subtitle" id="topbarSubtitle">Select a tool from the sidebar to get started</div>
+      </div>
+    </header>
+
+    <!-- CONTENT AREA -->
+    <div class="content-area">
+
+      <!-- ================== HOME ================== -->
+      <section class="tool-panel active" id="panel-home">
+        <div class="panel-header">
+          <h2>🛠️ PDF Toolkit</h2>
+          <p>Professional PDF tools that run 100% in your browser. No uploads, no servers, completely private.</p>
+        </div>
+
+        <div class="welcome-grid">
+          <div class="welcome-card" data-tool="merge">
+            <div class="card-icon">🔗</div>
+            <h4>Merge PDFs</h4>
+            <p>Combine multiple PDF files into one document</p>
+          </div>
+          <div class="welcome-card" data-tool="split">
+            <div class="card-icon">✂️</div>
+            <h4>Split PDF</h4>
+            <p>Extract specific pages or split by range</p>
+          </div>
+          <div class="welcome-card" data-tool="compress">
+            <div class="card-icon">🗜️</div>
+            <h4>Compress PDF</h4>
+            <p>Reduce file size while maintaining quality</p>
+          </div>
+          <div class="welcome-card" data-tool="pdf-to-text">
+            <div class="card-icon">📝</div>
+            <h4>PDF to Text</h4>
+            <p>Extract all text content from a PDF file</p>
+          </div>
+          <div class="welcome-card" data-tool="image-to-pdf">
+            <div class="card-icon">🖼️</div>
+            <h4>Image to PDF</h4>
+            <p>Convert JPG/PNG images into a PDF document</p>
+          </div>
+          <div class="welcome-card" data-tool="reorder">
+            <div class="card-icon">🔀</div>
+            <h4>Reorder Pages</h4>
+            <p>Drag and drop to rearrange PDF pages</p>
+          </div>
+          <div class="welcome-card" data-tool="watermark">
+            <div class="card-icon">💧</div>
+            <h4>Add Watermark</h4>
+            <p>Stamp text watermark on every page</p>
+          </div>
+          <div class="welcome-card" data-tool="sign">
+            <div class="card-icon">✍️</div>
+            <h4>Sign PDF</h4>
+            <p>Draw your signature and place it on the PDF</p>
+          </div>
+          <div class="welcome-card" data-tool="viewer">
+            <div class="card-icon">👁️</div>
+            <h4>PDF Viewer</h4>
+            <p>Preview PDF pages directly in browser</p>
+          </div>
+          <div class="welcome-card" data-tool="protect">
+            <div class="card-icon">🔒</div>
+            <h4>Protect PDF</h4>
+            <p>Add password protection to your PDF</p>
+          </div>
+        </div>
+
+        <div style="background: linear-gradient(135deg, var(--primary-light), #ede9fe); border-radius: var(--radius-lg); padding: 20px; border: 1px solid var(--primary);">
+          <div style="font-weight: 700; font-size: 14px; color: var(--primary); margin-bottom: 6px;">🔐 Your Privacy Matters</div>
+          <p style="font-size: 13px; color: var(--text-secondary);">All operations run entirely in your browser using JavaScript. Your files are never uploaded to any server. Everything stays local on your device.</p>
+        </div>
+      </section>
+
+      <!-- ================== MERGE ================== -->
+      <section class="tool-panel" id="panel-merge">
+        <div class="panel-header">
+          <h2>🔗 Merge PDFs</h2>
+          <p>Upload two or more PDF files and combine them into a single document. Drag them to reorder before merging.</p>
+        </div>
+
+        <div class="upload-zone" id="mergeDropzone">
+          <input type="file" id="mergeInput" multiple accept=".pdf" aria-label="Upload PDF files to merge" />
+          <span class="upload-icon">📁</span>
+          <h3>Drop your PDF files here</h3>
+          <p>or click to browse — you can pick multiple files</p>
+          <span class="btn-browse">📂 Choose Files</span>
+        </div>
+
+        <div class="file-list" id="mergeFileList"></div>
+
+        <div class="progress-wrap" id="mergeProgress">
+          <div class="progress-label">Merging PDFs...</div>
+          <div class="progress-bar"><div class="progress-fill" id="mergeFill"></div></div>
+        </div>
+
+        <div class="btn-group">
+          <button class="btn btn-primary btn-lg" id="mergePDFBtn" disabled>🔗 Merge All PDFs</button>
+          <button class="btn btn-secondary" id="mergeClearBtn">🗑️ Clear All</button>
+        </div>
+
+        <div class="result-card" id="mergeResult">
+          <div class="result-header">
+            <span class="result-icon">✅</span>
+            <div>
+              <div class="result-title">Merge Successful!</div>
+              <div class="result-subtitle" id="mergeResultMeta"></div>
+            </div>
+          </div>
+          <button class="btn btn-success" id="mergeDownloadBtn">⬇️ Download Merged PDF</button>
+        </div>
+      </section>
+
+      <!-- ================== SPLIT ================== -->
+      <section class="tool-panel" id="panel-split">
+        <div class="panel-header">
+          <h2>✂️ Split PDF</h2>
+          <p>Upload a PDF and specify the page range to extract. You can download each chunk separately.</p>
+        </div>
+
+        <div class="upload-zone" id="splitDropzone">
+          <input type="file" id="splitInput" accept=".pdf" aria-label="Upload PDF to split" />
+          <span class="upload-icon">📄</span>
+          <h3>Drop a PDF file here</h3>
+          <p>or click to browse</p>
+          <span class="btn-browse">📂 Choose File</span>
+        </div>
+
+        <div class="file-list" id="splitFileList"></div>
+
+        <div class="options-row" id="splitOptions" style="display:none;">
+          <div class="form-group">
+            <label for="splitMode">Split Mode</label>
+            <select class="form-control" id="splitMode">
+              <option value="range">Extract Range</option>
+              <option value="each">Split Each Page</option>
+              <option value="parts">Split Into N Parts</option>
+            </select>
+          </div>
+
+          <div class="split-range-group" id="splitRangeGroup">
+            <div class="form-group">
+              <label for="splitFrom">From Page</label>
+              <input class="form-control range-input" type="number" id="splitFrom" min="1" value="1" />
+            </div>
+            <div class="form-group">
+              <label for="splitTo">To Page</label>
+              <input class="form-control range-input" type="number" id="splitTo" min="1" value="1" />
+            </div>
+          </div>
+
+          <div class="form-group hidden" id="splitPartsGroup">
+            <label for="splitParts">Number of Parts</label>
+            <input class="form-control range-input" type="number" id="splitParts" min="2" value="2" />
+          </div>
+        </div>
+
+        <div class="progress-wrap" id="splitProgress">
+          <div class="progress-label" id="splitProgressLabel">Splitting PDF...</div>
+          <div class="progress-bar"><div class="progress-fill" id="splitFill"></div></div>
+        </div>
+
+        <div class="btn-group" id="splitBtnGroup" style="display:none;">
+          <button class="btn btn-primary btn-lg" id="splitPDFBtn">✂️ Split PDF</button>
+          <button class="btn btn-secondary" id="splitClearBtn">🗑️ Clear</button>
+        </div>
+
+        <div class="result-card" id="splitResult">
+          <div class="result-header">
+            <span class="result-icon">✅</span>
+            <div>
+              <div class="result-title">Split Successful!</div>
+              <div class="result-subtitle" id="splitResultMeta"></div>
+            </div>
+          </div>
+          <div id="splitDownloadList" class="flex gap-2" style="flex-wrap:wrap; margin-top:8px;"></div>
+        </div>
+      </section>
+
+      <!-- ================== COMPRESS ================== -->
+      <section class="tool-panel" id="panel-compress">
+        <div class="panel-header">
+          <h2>🗜️ Compress PDF</h2>
+          <p>Optimize your PDF to reduce file size. Works best on PDFs with embedded images.</p>
+        </div>
+
+        <div class="upload-zone" id="compressDropzone">
+          <input type="file" id="compressInput" accept=".pdf" aria-label="Upload PDF to compress" />
+          <span class="upload-icon">🗜️</span>
+          <h3>Drop a PDF file here</h3>
+          <p>or click to browse</p>
+          <span class="btn-browse">📂 Choose File</span>
+        </div>
+
+        <div class="file-list" id="compressFileList"></div>
+
+        <div class="options-row" id="compressOptions" style="display:none;">
+          <div class="form-group" style="flex:1;">
+            <label for="compressQuality">Image Quality: <span id="qualityVal">70</span>%</label>
+            <input type="range" id="compressQuality" min="10" max="100" value="70" />
+          </div>
+          <div class="form-group">
+            <label for="compressLevel">Optimization</label>
+            <select class="form-control" id="compressLevel">
+              <option value="low">Low (Fast)</option>
+              <option value="medium" selected>Medium (Recommended)</option>
+              <option value="high">High (Slower)</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="progress-wrap" id="compressProgress">
+          <div class="progress-label">Compressing PDF...</div>
+          <div class="progress-bar"><div class="progress-fill" id="compressFill"></div></div>
+        </div>
+
+        <div class="btn-group" id="compressBtnGroup" style="display:none;">
+          <button class="btn btn-primary btn-lg" id="compressPDFBtn">🗜️ Compress PDF</button>
+          <button class="btn btn-secondary" id="compressClearBtn">🗑️ Clear</button>
+        </div>
+
+        <div class="result-card" id="compressResult">
+          <div class="result-header">
+            <span class="result-icon">✅</span>
+            <div>
+              <div class="result-title">Compression Complete!</div>
+              <div class="result-subtitle" id="compressResultMeta"></div>
+            </div>
+          </div>
+          <button class="btn btn-success" id="compressDownloadBtn">⬇️ Download Compressed PDF</button>
+        </div>
+      </section>
+
+      <!-- ================== PDF TO TEXT ================== -->
+      <section class="tool-panel" id="panel-pdf-to-text">
+        <div class="panel-header">
+          <h2>📝 PDF to Text</h2>
+          <p>Extract all readable text from a PDF file. Results appear below.</p>
+        </div>
+
+        <div class="upload-zone" id="pttDropzone">
+          <input type="file" id="pttInput" accept=".pdf" aria-label="Upload PDF to extract text" />
+          <span class="upload-icon">📝</span>
+          <h3>Drop a PDF file here</h3>
+          <p>or click to browse</p>
+          <span class="btn-browse">📂 Choose File</span>
+        </div>
+
+        <div class="file-list" id="pttFileList"></div>
+
+        <div class="progress-wrap" id="pttProgress">
+          <div class="progress-label" id="pttProgressLabel">Extracting text...</div>
+          <div class="progress-bar"><div class="progress-fill" id="pttFill"></div></div>
+        </div>
+
+        <div class="btn-group" id="pttBtnGroup" style="display:none;">
+          <button class="btn btn-primary btn-lg" id="pttExtractBtn">📝 Extract Text</button>
+          <button class="btn btn-secondary" id="pttCopyBtn" disabled>📋 Copy All</button>
+          <button class="btn btn-secondary" id="pttDownloadBtn" disabled>⬇️ Download .txt</button>
+          <button class="btn btn-secondary" id="pttClearBtn">🗑️ Clear</button>
+        </div>
+
+        <div class="text-output hidden" id="pttOutput">
+          <pre id="pttText"></pre>
+        </div>
+      </section>
+
+      <!-- ================== IMAGE TO PDF ================== -->
+      <section class="tool-panel" id="panel-image-to-pdf">
+        <div class="panel-header">
+          <h2>🖼️ Image to PDF</h2>
+          <p>Convert one or more JPG/PNG images into a single PDF document. Drag images to reorder them.</p>
+        </div>
+
+        <div class="upload-zone" id="itpDropzone">
+          <input type="file" id="itpInput" multiple accept="image/jpeg,image/png,image/webp,image/gif" aria-label="Upload images to convert" />
+          <span class="upload-icon">🖼️</span>
+          <h3>Drop image files here</h3>
+          <p>Supports JPG, PNG, WebP — multiple files supported</p>
+          <span class="btn-browse">📂 Choose Images</span>
+        </div>
+
+        <div class="image-grid" id="itpImageGrid"></div>
+
+        <div class="options-row" id="itpOptions" style="display:none;">
+          <div class="form-group">
+            <label for="itpPageSize">Page Size</label>
+            <select class="form-control" id="itpPageSize">
+              <option value="A4">A4</option>
+              <option value="Letter">Letter</option>
+              <option value="auto">Fit to Image</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label for="itpOrientation">Orientation</label>
+            <select class="form-control" id="itpOrientation">
+              <option value="portrait">Portrait</option>
+              <option value="landscape">Landscape</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label for="itpMargin">Margin (px)</label>
+            <input class="form-control range-input" type="number" id="itpMargin" value="20" min="0" max="100" />
+          </div>
+        </div>
+
+        <div class="progress-wrap" id="itpProgress">
+          <div class="progress-label">Creating PDF...</div>
+          <div class="progress-bar"><div class="progress-fill" id="itpFill"></div></div>
+        </div>
+
+        <div class="btn-group" id="itpBtnGroup" style="display:none;">
+          <button class="btn btn-primary btn-lg" id="itpConvertBtn">🖼️ Convert to PDF</button>
+          <button class="btn btn-secondary" id="itpClearBtn">🗑️ Clear All</button>
+        </div>
+
+        <div class="result-card" id="itpResult">
+          <div class="result-header">
+            <span class="result-icon">✅</span>
+            <div>
+              <div class="result-title">PDF Created!</div>
+              <div class="result-subtitle" id="itpResultMeta"></div>
+            </div>
+          </div>
+          <button class="btn btn-success" id="itpDownloadBtn">⬇️ Download PDF</button>
+        </div>
+      </section>
+
+      <!-- ================== REORDER PAGES ================== -->
+      <section class="tool-panel" id="panel-reorder">
+        <div class="panel-header">
+          <h2>🔀 Reorder Pages</h2>
+          <p>Upload a PDF and drag the page thumbnails to rearrange them. Then save as a new PDF.</p>
+        </div>
+
+        <div class="upload-zone" id="reorderDropzone">
+          <input type="file" id="reorderInput" accept=".pdf" aria-label="Upload PDF to reorder pages" />
+          <span class="upload-icon">🔀</span>
+          <h3>Drop a PDF file here</h3>
+          <p>or click to browse</p>
+          <span class="btn-browse">📂 Choose File</span>
+        </div>
+
+        <div class="progress-wrap" id="reorderLoadProgress">
+          <div class="progress-label" id="reorderLoadLabel">Rendering pages...</div>
+          <div class="progress-bar"><div class="progress-fill" id="reorderLoadFill"></div></div>
+        </div>
+
+        <div class="page-grid" id="reorderGrid"></div>
+
+        <div class="btn-group" id="reorderBtnGroup" style="display:none;">
+          <button class="btn btn-primary btn-lg" id="reorderSaveBtn">💾 Save Reordered PDF</button>
+          <button class="btn btn-secondary" id="reorderResetBtn">↩️ Reset Order</button>
+          <button class="btn btn-secondary" id="reorderClearBtn">🗑️ Clear</button>
+        </div>
+
+        <div class="result-card" id="reorderResult">
+          <div class="result-header">
+            <span class="result-icon">✅</span>
+            <div>
+              <div class="result-title">Pages Reordered!</div>
+              <div class="result-subtitle" id="reorderResultMeta"></div>
+            </div>
+          </div>
+          <button class="btn btn-success" id="reorderDownloadBtn">⬇️ Download PDF</button>
+        </div>
+      </section>
+
+      <!-- ================== DELETE PAGES ================== -->
+      <section class="tool-panel" id="panel-delete-pages">
+        <div class="panel-header">
+          <h2>🗑️ Delete Pages</h2>
+          <p>Upload a PDF, select the pages you want to remove, then save the cleaned PDF.</p>
+        </div>
+
+        <div class="upload-zone" id="deleteDropzone">
+          <input type="file" id="deleteInput" accept=".pdf" aria-label="Upload PDF for page deletion" />
+          <span class="upload-icon">🗑️</span>
+          <h3>Drop a PDF file here</h3>
+          <p>or click to browse</p>
+          <span class="btn-browse">📂 Choose File</span>
+        </div>
+
+        <div class="progress-wrap" id="deleteLoadProgress">
+          <div class="progress-label" id="deleteLoadLabel">Rendering pages...</div>
+          <div class="progress-bar"><div class="progress-fill" id="deleteLoadFill"></div></div>
+        </div>
+
+        <div id="deletePageActions" style="display:none;" class="mt-3">
+          <div class="flex gap-2 items-center" style="flex-wrap:wrap;">
+            <button class="btn btn-secondary btn-sm" id="deleteSelectAll">☑ Select All</button>
+            <button class="btn btn-secondary btn-sm" id="deleteSelectNone">☐ Select None</button>
+            <span class="text-sm text-muted" id="deleteCount">0 pages selected for deletion</span>
+          </div>
+        </div>
+
+        <div class="page-grid" id="deleteGrid"></div>
+
+        <div class="btn-group" id="deleteBtnGroup" style="display:none;">
+          <button class="btn btn-danger btn-lg" id="deleteApplyBtn">🗑️ Delete Selected Pages</button>
+          <button class="btn btn-secondary" id="deleteClearBtn">🗑️ Clear</button>
+        </div>
+
+        <div class="result-card" id="deleteResult">
+          <div class="result-header">
+            <span class="result-icon">✅</span>
+            <div>
+              <div class="result-title">Pages Deleted!</div>
+              <div class="result-subtitle" id="deleteResultMeta"></div>
+            </div>
+          </div>
+          <button class="btn btn-success" id="deleteDownloadBtn">⬇️ Download PDF</button>
+        </div>
+      </section>
+
+      <!-- ================== WATERMARK ================== -->
+      <section class="tool-panel" id="panel-watermark">
+        <div class="panel-header">
+          <h2>💧 Add Watermark</h2>
+          <p>Stamp a text watermark diagonally across every page of your PDF.</p>
+        </div>
+
+        <div class="upload-zone" id="watermarkDropzone">
+          <input type="file" id="watermarkInput" accept=".pdf" aria-label="Upload PDF to watermark" />
+          <span class="upload-icon">💧</span>
+          <h3>Drop a PDF file here</h3>
+          <p>or click to browse</p>
+          <span class="btn-browse">📂 Choose File</span>
+        </div>
+
+        <div class="file-list" id="watermarkFileList"></div>
+
+        <div class="options-row" id="watermarkOptions" style="display:none;">
+          <div class="form-group" style="flex:1;">
+            <label for="watermarkText">Watermark Text</label>
+            <input class="form-control" type="text" id="watermarkText" value="CONFIDENTIAL" placeholder="e.g. DRAFT, CONFIDENTIAL" />
+          </div>
+          <div class="form-group">
+            <label for="watermarkColor">Color</label>
+            <input type="color" id="watermarkColor" value="#ff000033" />
+          </div>
+          <div class="form-group">
+            <label for="watermarkSize">Font Size</label>
+            <input class="form-control range-input" type="number" id="watermarkSize" value="60" min="12" max="200" />
+          </div>
+          <div class="form-group">
+            <label for="watermarkOpacity">Opacity: <span id="watermarkOpacityVal">40</span>%</label>
+            <input type="range" id="watermarkOpacity" min="5" max="100" value="40" />
+          </div>
+        </div>
+
+        <div class="progress-wrap" id="watermarkProgress">
+          <div class="progress-label">Adding watermark...</div>
+          <div class="progress-bar"><div class="progress-fill" id="watermarkFill"></div></div>
+        </div>
+
+        <div class="btn-group" id="watermarkBtnGroup" style="display:none;">
+          <button class="btn btn-primary btn-lg" id="watermarkApplyBtn">💧 Apply Watermark</button>
+          <button class="btn btn-secondary" id="watermarkClearBtn">🗑️ Clear</button>
+        </div>
+
+        <div class="result-card" id="watermarkResult">
+          <div class="result-header">
+            <span class="result-icon">✅</span>
+            <div>
+              <div class="result-title">Watermark Applied!</div>
+              <div class="result-subtitle" id="watermarkResultMeta"></div>
+            </div>
+          </div>
+          <button class="btn btn-success" id="watermarkDownloadBtn">⬇️ Download PDF</button>
+        </div>
+      </section>
+
+      <!-- ================== PAGE NUMBERS ================== -->
+      <section class="tool-panel" id="panel-page-numbers">
+        <div class="panel-header">
+          <h2>🔢 Add Page Numbers</h2>
+          <p>Automatically stamp page numbers on every page of your PDF.</p>
+        </div>
+
+        <div class="upload-zone" id="pnDropzone">
+          <input type="file" id="pnInput" accept=".pdf" aria-label="Upload PDF for page numbers" />
+          <span class="upload-icon">🔢</span>
+          <h3>Drop a PDF file here</h3>
+          <p>or click to browse</p>
+          <span class="btn-browse">📂 Choose File</span>
+        </div>
+
+        <div class="file-list" id="pnFileList"></div>
+
+        <div class="options-row" id="pnOptions" style="display:none;">
+          <div class="form-group">
+            <label for="pnPosition">Position</label>
+            <select class="form-control" id="pnPosition">
+              <option value="bottom-center" selected>Bottom Center</option>
+              <option value="bottom-right">Bottom Right</option>
+              <option value="bottom-left">Bottom Left</option>
+              <option value="top-center">Top Center</option>
+              <option value="top-right">Top Right</option>
+              <option value="top-left">Top Left</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label for="pnFormat">Format</label>
+            <select class="form-control" id="pnFormat">
+              <option value="n">1, 2, 3…</option>
+              <option value="page-n">Page 1, Page 2…</option>
+              <option value="n-of-t">1 of 10, 2 of 10…</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label for="pnStartNum">Start Number</label>
+            <input class="form-control range-input" type="number" id="pnStartNum" value="1" min="1" />
+          </div>
+          <div class="form-group">
+            <label for="pnFontSize">Font Size</label>
+            <input class="form-control range-input" type="number" id="pnFontSize" value="12" min="6" max="36" />
+          </div>
+        </div>
+
+        <div class="progress-wrap" id="pnProgress">
+          <div class="progress-label">Adding page numbers...</div>
+          <div class="progress-bar"><div class="progress-fill" id="pnFill"></div></div>
+        </div>
+
+        <div class="btn-group" id="pnBtnGroup" style="display:none;">
+          <button class="btn btn-primary btn-lg" id="pnApplyBtn">🔢 Add Page Numbers</button>
+          <button class="btn btn-secondary" id="pnClearBtn">🗑️ Clear</button>
+        </div>
+
+        <div class="result-card" id="pnResult">
+          <div class="result-header">
+            <span class="result-icon">✅</span>
+            <div>
+              <div class="result-title">Page Numbers Added!</div>
+              <div class="result-subtitle" id="pnResultMeta"></div>
+            </div>
+          </div>
+          <button class="btn btn-success" id="pnDownloadBtn">⬇️ Download PDF</button>
+        </div>
+      </section>
+
+      <!-- ================== ROTATE PAGES ================== -->
+      <section class="tool-panel" id="panel-rotate">
+        <div class="panel-header">
+          <h2>🔄 Rotate Pages</h2>
+          <p>Upload a PDF to see page thumbnails. Click rotation buttons on each page, or use bulk rotate.</p>
+        </div>
+
+        <div class="upload-zone" id="rotateDropzone">
+          <input type="file" id="rotateInput" accept=".pdf" aria-label="Upload PDF to rotate pages" />
+          <span class="upload-icon">🔄</span>
+          <h3>Drop a PDF file here</h3>
+          <p>or click to browse</p>
+          <span class="btn-browse">📂 Choose File</span>
+        </div>
+
+        <div class="progress-wrap" id="rotateLoadProgress">
+          <div class="progress-label">Rendering pages...</div>
+          <div class="progress-bar"><div class="progress-fill" id="rotateLoadFill"></div></div>
+        </div>
+
+        <div id="rotateBulkControls" style="display:none;" class="mt-3">
+          <div class="flex gap-2 items-center" style="flex-wrap:wrap;">
+            <span class="text-sm font-bold">Bulk Rotate:</span>
+            <button class="btn btn-secondary btn-sm" id="rotateAllLeft">↺ All Left 90°</button>
+            <button class="btn btn-secondary btn-sm" id="rotateAllRight">↻ All Right 90°</button>
+            <button class="btn btn-secondary btn-sm" id="rotateAll180">⟳ All 180°</button>
+            <button class="btn btn-secondary btn-sm" id="rotateReset">↩️ Reset All</button>
+          </div>
+        </div>
+
+        <div class="page-grid" id="rotateGrid"></div>
+
+        <div class="btn-group" id="rotateBtnGroup" style="display:none;">
+          <button class="btn btn-primary btn-lg" id="rotateSaveBtn">🔄 Save Rotated PDF</button>
+          <button class="btn btn-secondary" id="rotateClearBtn">🗑️ Clear</button>
+        </div>
+
+        <div class="result-card" id="rotateResult">
+          <div class="result-header">
+            <span class="result-icon">✅</span>
+            <div>
+              <div class="result-title">Rotation Applied!</div>
+              <div class="result-subtitle" id="rotateResultMeta"></div>
+            </div>
+          </div>
+          <button class="btn btn-success" id="rotateDownloadBtn">⬇️ Download PDF</button>
+        </div>
+      </section>
+
+      <!-- ================== PROTECT ================== -->
+      <section class="tool-panel" id="panel-protect">
+        <div class="panel-header">
+          <h2>🔒 Password Protect PDF</h2>
+          <p>Add an open password to your PDF. Recipients will need the password to view it.</p>
+        </div>
+
+        <div class="upload-zone" id="protectDropzone">
+          <input type="file" id="protectInput" accept=".pdf" aria-label="Upload PDF to protect" />
+          <span class="upload-icon">🔒</span>
+          <h3>Drop a PDF file here</h3>
+          <p>or click to browse</p>
+          <span class="btn-browse">📂 Choose File</span>
+        </div>
+
+        <div class="file-list" id="protectFileList"></div>
+
+        <div class="options-row" id="protectOptions" style="display:none;">
+          <div class="form-group" style="flex:1;">
+            <label for="userPassword">Open Password (required to view)</label>
+            <input class="form-control" type="password" id="userPassword" placeholder="Enter password…" autocomplete="new-password" />
+          </div>
+          <div class="form-group" style="flex:1;">
+            <label for="ownerPassword">Owner Password (optional, for permissions)</label>
+            <input class="form-control" type="password" id="ownerPassword" placeholder="Leave blank to use same" autocomplete="new-password" />
+          </div>
+        </div>
+
+        <div class="progress-wrap" id="protectProgress">
+          <div class="progress-label">Encrypting PDF...</div>
+          <div class="progress-bar"><div class="progress-fill" id="protectFill"></div></div>
+        </div>
+
+        <div class="btn-group" id="protectBtnGroup" style="display:none;">
+          <button class="btn btn-primary btn-lg" id="protectApplyBtn">🔒 Protect PDF</button>
+          <button class="btn btn-secondary" id="protectClearBtn">🗑️ Clear</button>
+        </div>
+
+        <div style="background: #fef3c7; border: 1px solid #f59e0b; border-radius: var(--radius-md); padding: 14px; margin-top: 12px; font-size: 13px; color: #92400e; display: none;" id="protectNote">
+          ⚠️ <strong>Note:</strong> pdf-lib's encryption works client-side. For strongest AES-256 encryption, use a dedicated tool. This adds standard PDF password protection.
+        </div>
+
+        <div class="result-card" id="protectResult">
+          <div class="result-header">
+            <span class="result-icon">✅</span>
+            <div>
+              <div class="result-title">PDF Protected!</div>
+              <div class="result-subtitle" id="protectResultMeta"></div>
+            </div>
+          </div>
+          <button class="btn btn-success" id="protectDownloadBtn">⬇️ Download Protected PDF</button>
+        </div>
+      </section>
+
+      <!-- ================== PDF VIEWER ================== -->
+      <section class="tool-panel" id="panel-viewer">
+        <div class="panel-header">
+          <h2>👁️ PDF Viewer</h2>
+          <p>Preview your PDF pages directly in the browser without downloading anything.</p>
+        </div>
+
+        <div class="upload-zone" id="viewerDropzone">
+          <input type="file" id="viewerInput" accept=".pdf" aria-label="Upload PDF to preview" />
+          <span class="upload-icon">👁️</span>
+          <h3>Drop a PDF file here</h3>
+          <p>or click to browse</p>
+          <span class="btn-browse">📂 Choose File</span>
+        </div>
+
+        <div class="progress-wrap" id="viewerProgress">
+          <div class="progress-label" id="viewerProgressLabel">Rendering pages...</div>
+          <div class="progress-bar"><div class="progress-fill" id="viewerFill"></div></div>
+        </div>
+
+        <div class="viewer-wrap" id="viewerWrap" style="display:none;">
+          <div class="viewer-toolbar">
+            <button class="btn btn-secondary btn-sm" id="viewerPrevPage">◀ Prev</button>
+            <span class="text-sm" id="viewerPageInfo">Page 1 of 1</span>
+            <button class="btn btn-secondary btn-sm" id="viewerNextPage">Next ▶</button>
+            <div style="flex:1;"></div>
+            <button class="btn btn-secondary btn-sm" id="viewerZoomOut">➖</button>
+            <span class="text-sm" id="viewerZoomVal">100%</span>
+            <button class="btn btn-secondary btn-sm" id="viewerZoomIn">➕</button>
+            <button class="btn btn-secondary btn-sm" id="viewerFitWidth">⬜ Fit</button>
+          </div>
+          <div class="viewer-pages" id="viewerPages"></div>
+        </div>
+
+        <div class="btn-group" id="viewerBtnGroup" style="display:none;">
+          <button class="btn btn-secondary" id="viewerClearBtn">🗑️ Clear</button>
+        </div>
+      </section>
+
+      <!-- ================== SIGN PDF ================== -->
+      <section class="tool-panel" id="panel-sign">
+        <div class="panel-header">
+          <h2>✍️ Sign PDF</h2>
+          <p>Draw your signature, then stamp it on a selected page and position of your PDF.</p>
+        </div>
+
+        <div class="upload-zone" id="signDropzone">
+          <input type="file" id="signInput" accept=".pdf" aria-label="Upload PDF to sign" />
+          <span class="upload-icon">✍️</span>
+          <h3>Drop a PDF file here</h3>
+          <p>or click to browse</p>
+          <span class="btn-browse">📂 Choose File</span>
+        </div>
+
+        <div class="file-list" id="signFileList"></div>
+
+        <div id="signOptions" style="display:none;">
+          <div class="divider"></div>
+          <h4 style="font-size:14px; font-weight:700; margin-bottom:8px;">Step 1: Draw Your Signature</h4>
+          <div class="sig-canvas-wrap">
+            <canvas id="signatureCanvas" width="800" height="200" aria-label="Signature drawing area"></canvas>
+          </div>
+          <div class="sig-controls">
+            <button class="btn btn-secondary btn-sm" id="sigClear">🗑️ Clear</button>
+            <div class="form-group" style="flex-direction:row; align-items:center; gap:6px; margin:0;">
+              <label for="sigColor" style="margin:0; font-size:12px;">Color:</label>
+              <input type="color" id="sigColor" value="#000000" style="width:32px; height:28px; padding:2px;" />
+            </div>
+            <div class="form-group" style="flex-direction:row; align-items:center; gap:6px; margin:0;">
+              <label style="font-size:12px; margin:0;">Width:</label>
+              <input type="range" id="sigWidth" min="1" max="10" value="2" style="width:80px;" />
+            </div>
+          </div>
+
+          <div class="divider"></div>
+          <h4 style="font-size:14px; font-weight:700; margin-bottom:8px;">Step 2: Placement Settings</h4>
+          <div class="options-row">
+            <div class="form-group">
+              <label for="signPage">Page</label>
+              <input class="form-control range-input" type="number" id="signPage" value="1" min="1" />
+            </div>
+            <div class="form-group">
+              <label for="signX">X Position</label>
+              <input class="form-control range-input" type="number" id="signX" value="50" min="0" />
+            </div>
+            <div class="form-group">
+              <label for="signY">Y Position</label>
+              <input class="form-control range-input" type="number" id="signY" value="50" min="0" />
+            </div>
+            <div class="form-group">
+              <label for="signScale">Width (px)</label>
+              <input class="form-control range-input" type="number" id="signScale" value="200" min="50" max="600" />
+            </div>
+          </div>
+
+          <div class="btn-group">
+            <button class="btn btn-primary btn-lg" id="signApplyBtn">✍️ Stamp Signature on PDF</button>
+            <button class="btn btn-secondary" id="signClearFileBtn">🗑️ Clear</button>
+          </div>
+        </div>
+
+        <div class="progress-wrap" id="signProgress">
+          <div class="progress-label">Stamping signature...</div>
+          <div class="progress-bar"><div class="progress-fill" id="signFill"></div></div>
+        </div>
+
+        <div class="result-card" id="signResult">
+          <div class="result-header">
+            <span class="result-icon">✅</span>
+            <div>
+              <div class="result-title">Signature Applied!</div>
+              <div class="result-subtitle" id="signResultMeta"></div>
+            </div>
+          </div>
+          <button class="btn btn-success" id="signDownloadBtn">⬇️ Download Signed PDF</button>
+        </div>
+      </section>
+
+    </div><!-- /content-area -->
+  </main>
+
+</div><!-- /app-layout -->
+
+<script src="script.js"></script>
+<!-- 
+  To build script.js: concatenate all 4 parts in order:
+  script_1.js + script_2.js + script_3.js + script_4.js → script.js 
+-->
+</body>
+</html>
