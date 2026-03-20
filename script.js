@@ -502,6 +502,9 @@ async function getPDFPageCount(arrayBuffer) {
 
 // ================================================
 // COMPRESS PDF TOOL
+// Real compression: rasterize each page via pdf.js
+// canvas → JPEG at chosen quality → rebuild with pdf-lib.
+// Typical savings: 40–80% for image-heavy PDFs.
 // ================================================
 (function initCompress() {
   const dropzone   = document.getElementById('compressDropzone');
@@ -564,48 +567,79 @@ async function getPDFPageCount(arrayBuffer) {
     if (!currentFile) return;
     try {
       compBtn.disabled = true;
-      const setP  = animateProgress(progressF, progressW, 'Compressing PDF…');
-      const buf   = await readFileAsArrayBuffer(currentFile);
+
+      // Quality: 0.10 – 1.00 (JPEG encode quality per page)
       const quality = parseInt(qualSlider.value) / 100;
-      const level   = document.getElementById('compressLevel').value;
 
-      setP(20);
-      // Load with pdf-lib and re-save (removes redundant data, compresses streams)
-      const pdfDoc = await PDFLib.PDFDocument.load(buf, { ignoreEncryption: true });
-      setP(50);
+      // Render scale maps to effective DPI: lower = smaller file
+      const level    = document.getElementById('compressLevel').value;
+      const scaleMap = { low: 0.8, medium: 1.1, high: 1.5 };
+      const renderScale = scaleMap[level] || 1.1;
 
-      // Re-embed images at lower quality using canvas
-      const pages = pdfDoc.getPages();
-      // For each page, attempt to re-compress embedded images
-      // pdf-lib doesn't expose raw image re-compression, so we use a canvas approach
-      // for PDFs that are text-heavy this still reduces size via stream optimization
+      const progressLabel = progressW.querySelector('.progress-label');
+      const setP = animateProgress(progressF, progressW, 'Loading PDF…');
 
-      let compressionLevel;
-      if (level === 'low')    compressionLevel = 3;
-      else if (level === 'high') compressionLevel = 9;
-      else compressionLevel = 6;
+      // Load with pdf.js for pixel-accurate rendering
+      const buf   = await readFileAsArrayBuffer(currentFile);
+      const pdfJs = await pdfjsLib.getDocument({ data: buf }).promise;
+      const total = pdfJs.numPages;
 
-      setP(70);
-      // Save with object compression enabled
-      const pdfBytes = await pdfDoc.save({
-        useObjectStreams: true,
-        addDefaultPage: false,
-        objectsPerTick: 50,
-      });
-      setP(95);
+      setP(5);
+
+      // Create a fresh pdf-lib document
+      const newDoc = await PDFLib.PDFDocument.create();
+
+      for (let i = 1; i <= total; i++) {
+        progressLabel.textContent = `Compressing page ${i} / ${total}…`;
+        setP(5 + ((i - 1) / total) * 88);
+
+        // Render PDF page onto an offscreen canvas
+        const pdfPage  = await pdfJs.getPage(i);
+        const viewport = pdfPage.getViewport({ scale: renderScale });
+        const canvas   = document.createElement('canvas');
+        canvas.width   = Math.floor(viewport.width);
+        canvas.height  = Math.floor(viewport.height);
+        const ctx      = canvas.getContext('2d');
+
+        // Fill white so transparent areas become white (JPEG has no alpha)
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+        await pdfPage.render({ canvasContext: ctx, viewport }).promise;
+
+        // Encode as JPEG at user-chosen quality (this is where size reduction happens)
+        const jpegDataUrl = canvas.toDataURL('image/jpeg', quality);
+        const jpegBase64  = jpegDataUrl.split(',')[1];
+        const jpegBytes   = Uint8Array.from(atob(jpegBase64), c => c.charCodeAt(0));
+
+        // Embed JPEG image into new pdf-lib page
+        const embImg  = await newDoc.embedJpg(jpegBytes);
+        const newPage = newDoc.addPage([canvas.width, canvas.height]);
+        newPage.drawImage(embImg, { x: 0, y: 0, width: canvas.width, height: canvas.height });
+
+        // Release canvas memory immediately
+        canvas.width = 1; canvas.height = 1;
+      }
+
+      progressLabel.textContent = 'Finalising output PDF…';
+      setP(96);
+      const pdfBytes  = await newDoc.save();
+      setP(100);
       resultBytes = pdfBytes;
 
-      const saved   = currentFile.size - pdfBytes.length;
-      const pct     = ((saved / currentFile.size) * 100).toFixed(1);
-      const metaTxt = saved > 0
-        ? `${formatBytes(currentFile.size)} → ${formatBytes(pdfBytes.length)} (saved ${pct}%)`
-        : `${formatBytes(pdfBytes.length)} (already optimized — ${formatBytes(pdfBytes.length)} output)`;
+      const origSize = currentFile.size;
+      const newSize  = pdfBytes.length;
+      const saved    = origSize - newSize;
+      const pct      = ((saved / origSize) * 100).toFixed(1);
+      const metaTxt  = saved > 0
+        ? `${formatBytes(origSize)} → ${formatBytes(newSize)}  ·  saved ${pct}% 🎉`
+        : `${formatBytes(origSize)} → ${formatBytes(newSize)}  (try a lower quality or scale)`;
 
       setTimeout(() => {
         hideProgress(progressW);
         showResultCard(resultCard, metaTxt);
         resultMeta.textContent = metaTxt;
-        showToast('Compression complete!', 'success');
+        showToast(saved > 0 ? `Compressed! Saved ${pct}%` : 'Done.', 'success');
         compBtn.disabled = false;
       }, 400);
 
