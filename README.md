@@ -129,7 +129,7 @@
 ```
 1/
 ├── index.html     # Full app — all 12 tool panels + sidebar
-├── script.js      # All PDF logic (merge, split, compress…)
+├── script.js      # All PDF logic (merge, split, compress.)
 └── style.css      # Complete styling & dark mode
 ```
 
